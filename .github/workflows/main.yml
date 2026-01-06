@@ -1,0 +1,67 @@
+name: Build Redline Final
+on: [push]
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install & Build Frontend
+        run: |
+          npm install
+          npm run build
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+      - name: Install PyInstaller
+        run: pip install pyinstaller pywebview pymem
+      - name: Create Main Script
+        shell: pwsh
+        run: |
+          $code = @"
+          import webview
+          import os
+          import sys
+          import time
+          from pymem import Pymem
+
+          class API:
+              def __init__(self):
+                  self.pm = None
+                  self.target = "HD-Player.exe"
+
+              def apply_setting(self, key, value):
+                  print(f"Applying: {key} = {value}")
+                  try:
+                      if self.pm is None:
+                          self.pm = Pymem(self.target)
+                      
+                      # Пример логики для No Recoil (упрощенно)
+                      if key == "noRecoil" and value == True:
+                          # Тут записываем адрес памяти (нужны оффсеты)
+                          # self.pm.write_float(address, 0.0)
+                          pass
+                  except:
+                      print("Process not found")
+
+          def resource_path(relative_path):
+              base_path = getattr(sys, '_MEIPASS', os.path.abspath("."))
+              return os.path.join(base_path, relative_path)
+
+          api = API()
+          window = webview.create_window('REDLINE ARCHITECT', resource_path('dist/index.html'), js_api=api, width=1200, height=800)
+          webview.start()
+          "@
+          $code | Out-File -FilePath main.py -Encoding utf8
+      - name: Compile EXE
+        run: |
+          pyinstaller --noconsole --onefile --icon=REDLINE.ico --add-data "dist;dist" main.py
+      - name: Upload Result
+        uses: actions/upload-artifact@v4
+        with:
+          name: Redline-Final-Package
+          path: dist/*.exe
